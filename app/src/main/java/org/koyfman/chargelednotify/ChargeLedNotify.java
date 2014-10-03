@@ -16,6 +16,7 @@ public class ChargeLedNotify implements IXposedHookZygoteInit {
     private static final int LIGHT_ID_NOTIFICATIONS = 4;
 
     private static Object mLight;
+    private static boolean mLedEnabled = false;
 
     // For debug logging only
     public static final void log(String m)    { XposedBridge.log(PKGNAME + ": " + m); }
@@ -57,12 +58,14 @@ public class ChargeLedNotify implements IXposedHookZygoteInit {
 
                         switch (id) {
                             case LIGHT_ID_NOTIFICATIONS:
-                                if (color != 0) {
+                                if (color != 0 && !mLedEnabled) {
                                     if (DEBUG) log("New notification");
                                     enableChargeLED();
-                                } else {
+                                    mLedEnabled = true;
+                                } else if (color == 0 && mLedEnabled) {
                                     if (DEBUG) log("Notifications dismissed");
                                     disableChargeLED();
+                                    mLedEnabled = false;
                                 }
                                 break;
                             case LIGHT_ID_BATTERY:
