@@ -19,7 +19,7 @@ public class ChargeLedNotify implements IXposedHookZygoteInit {
     private static boolean mLedEnabled = false;
 
     // For debug logging only
-    public static final void log(String m)    { XposedBridge.log(PKGNAME + ": " + m); }
+    private static void log(String m)    { XposedBridge.log(PKGNAME + ": " + m); }
 
     private static void setChargeLED(boolean enable) {
         if (mLightsService == null) return;
