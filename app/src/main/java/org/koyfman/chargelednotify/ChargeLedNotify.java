@@ -1,7 +1,6 @@
 package org.koyfman.chargelednotify;
 
 import android.graphics.Color;
-
 import de.robv.android.xposed.IXposedHookZygoteInit;
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
@@ -15,25 +14,37 @@ public class ChargeLedNotify implements IXposedHookZygoteInit {
     private static final int LIGHT_ID_BATTERY = 3;
     private static final int LIGHT_ID_NOTIFICATIONS = 4;
 
-    private static Object mLight;
+    private static Object mLightsService;
+    private static int mNativePointer;
     private static boolean mLedEnabled = false;
 
     // For debug logging only
     public static final void log(String m)    { XposedBridge.log(PKGNAME + ": " + m); }
 
     private static void setChargeLED(boolean enable) {
-        if (mLight == null) return;
+        if (mLightsService == null) return;
         int color = enable ? Color.RED : 0;
 
         try {
-            Object ls = XposedHelpers.getSurroundingThis(mLight);
-            int np = XposedHelpers.getIntField(ls, "mNativePointer");
             if (DEBUG) log("setLight_native(color=" + color + ")");
-            XposedHelpers.callMethod(ls, "setLight_native",
-                                     np, LIGHT_ID_BATTERY, color, 0, 0, 0, 0);
+            XposedHelpers.callMethod(mLightsService, "setLight_native",
+                                     mNativePointer, LIGHT_ID_BATTERY, color, 0, 0, 0, 0);
         } catch (Throwable t) {
             XposedBridge.log(t);
         }
+    }
+
+    private static void logLightStatus(int lightId) {
+        Object light = XposedHelpers.callMethod(mLightsService, "getLight", lightId);
+        int color = XposedHelpers.getIntField(light, "mColor");
+        int mode = XposedHelpers.getIntField(light, "mMode");
+        int onMS = XposedHelpers.getIntField(light, "mOnMS");
+        int offMS = XposedHelpers.getIntField(light, "mOffMS");
+        boolean flashing = XposedHelpers.getBooleanField(light, "mFlashing");
+        log("Status for light=" + lightId + ": " +
+            "color=" + color + "; mode=" + mode +
+            "; onMS=" + onMS + "; offMS=" + offMS +
+            "; flashing=" + flashing);
     }
 
     private static void enableChargeLED()  { setChargeLED(true); }
@@ -48,7 +59,11 @@ public class ChargeLedNotify implements IXposedHookZygoteInit {
 
                     @Override
                     protected void beforeHookedMethod(final MethodHookParam param) throws Throwable {
-                        if (mLight == null) mLight = param.thisObject;
+                        if (mLightsService == null) {
+                            Object light = param.thisObject;
+                            mLightsService = XposedHelpers.getSurroundingThis(light);
+                            mNativePointer = XposedHelpers.getIntField(mLightsService, "mNativePointer");
+                        }
                         int id = XposedHelpers.getIntField(param.thisObject, "mId");
                         int color = (Integer)param.args[0];
 
@@ -76,6 +91,8 @@ public class ChargeLedNotify implements IXposedHookZygoteInit {
                                 // Pass-through unrelated light events unhindered
                                 break;
                         }
+
+                        if (DEBUG) logLightStatus(LIGHT_ID_BATTERY);
                     }
                 });
     }
